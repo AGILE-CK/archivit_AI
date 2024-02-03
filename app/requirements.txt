@@ -1,0 +1,10 @@
+torch>=1.8.1
+transformers>=4.5.0
+pyaudio>=0.2.11
+librosa>=0.8.0
+sounddevice>=0.4.1
+pydub>=0.25.1
+soynlp>=0.0.493
+fastapi>=0.65.1
+uvicorn>=0.13.4
+numpy>=1.19.5
