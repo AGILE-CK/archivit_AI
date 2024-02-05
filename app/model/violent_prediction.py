@@ -8,11 +8,35 @@ import emoji
 from soynlp.normalizer import repeat_normalize
 import queue
 import threading
-from model.model_utils import init_models
+from pydub import AudioSegment
+from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, AutoTokenizer, AutoModelForSequenceClassification, pipeline
 
-# Initialize models and processor from the model_utils file
-model_speech, tokenizer_violent, model_violent, processor, pipe, device = init_models()
 
+# Initialize models and processor
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
+torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+model_id = "openai/whisper-large-v3"
+
+model_speech = AutoModelForSpeechSeq2Seq.from_pretrained(
+    model_id, torch_dtype=torch_dtype, low_cpu_mem_usage=True, use_safetensors=True
+).to(device)
+
+tokenizer_violent = AutoTokenizer.from_pretrained("./model/tokenizer_violent_detection")
+model_violent = AutoModelForSequenceClassification.from_pretrained("./model/model_violent_detection").to(device)    
+
+processor = AutoProcessor.from_pretrained(model_id)
+pipe = pipeline(
+    "automatic-speech-recognition",
+    model=model_speech,
+    tokenizer=processor.tokenizer,
+    feature_extractor=processor.feature_extractor,
+    max_new_tokens=128,
+    chunk_length_s=30,
+    batch_size=16,
+    return_timestamps=True,
+    torch_dtype=torch_dtype,
+    device=device,
+)  
 
 # Function to preprocess text
 def text_preprocess(text):
@@ -50,7 +74,7 @@ def predict_and_classify_violence(sentence):
     else:
         return "Unclassified"
 
-def record_audio(duration=5, samplerate=16000):
+def record_audio(duration=3, samplerate=16000):
     """Record audio for a given duration and samplerate."""
     audio = sd.rec(int(duration * samplerate), samplerate=samplerate, channels=1, dtype='float32')
     sd.wait()  # Wait until recording is finished
@@ -65,6 +89,16 @@ def save_to_wav(audio, filename, samplerate=16000):
         wf.setframerate(samplerate)
         wf.writeframes(audio.tobytes())
 
+def convert_to_wav(file_path, original_suffix):
+    """Convert an audio file to WAV format if necessary."""
+    if original_suffix in [".wav", ".wave"]:
+        return file_path  # No conversion needed for WAV files
+
+    sound = AudioSegment.from_file(file_path)
+    wav_file_path = file_path.rsplit('.', 1)[0] + ".wav"
+    sound.export(wav_file_path, format="wav")
+    return wav_file_path
+
 def transcribe_audio(filename):
     """Transcribe the audio file using the speech recognition pipeline."""
     try:
@@ -73,7 +107,6 @@ def transcribe_audio(filename):
     except Exception as e:
         print("Error in processing audio:", e)
         return None
-
 
 transcription_queue = queue.Queue()
 stop_processing = threading.Event()  # Added to signal stopping of processing
