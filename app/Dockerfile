@@ -1,17 +1,14 @@
-# Use an official Python runtime as a parent image
-FROM tiangolo/uvicorn-gunicorn-fastapi:python3.11
+FROM python:3.11-slim-buster
 
-# Set the working directory in the container to /app
 WORKDIR /app
 
-# Copy the current directory contents into the container at /app
 COPY ./ /app
 
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get install -y ffmpeg portaudio19-dev
-RUN pip install pyaudio
+    apt-get install -y ffmpeg portaudio19-dev gcc 
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt
 
-
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+EXPOSE 8080
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
