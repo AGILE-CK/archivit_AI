@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from model.diarization_transcription import segment_and_transcribe
 from pydantic import BaseModel
 import tempfile
+from model.summarization import generate_content
 
 
 
@@ -17,14 +18,16 @@ app = FastAPI()
 class TextIn(BaseModel):
     text: str
 
-# @app.post("/summarize/")
-# async def create_summary(request: TextIn):
-#     try:
-#         summary = summarizer.generate_summary(request.text)
-#         return {"summary": summary}
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
+class PromptRequest(BaseModel):
+    prompt_parts: list
 
+@app.post("/summarize/")
+def generate(prompt_request: PromptRequest):
+    try:
+        text = generate_content(prompt_request.prompt_parts)
+        return {"generated_text": text}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/violent-speech-detection/")
 async def violent_speech_detection(file: UploadFile = File(...)):
@@ -47,7 +50,7 @@ async def violent_speech_detection(file: UploadFile = File(...)):
         os.remove(temp_file_path)
         os.remove(wav_file_path)
 
-        return {"violence_status": violence_status}
+        return {"transcription": transcription, "violence_status": violence_status}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
